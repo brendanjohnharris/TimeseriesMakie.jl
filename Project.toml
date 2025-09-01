@@ -18,5 +18,5 @@ TimeseriesToolsExt = ["TimeseriesTools"]
 LinearAlgebra = "1.10"
 Makie = "0.24"
 Random = "1.10"
-TimeseriesTools = "0.7"
+TimeseriesTools = "0.8"
 julia = "1.10"

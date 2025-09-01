@@ -12,7 +12,7 @@ end
 
 @testitem "SpectrumPlot TimeseriesTools" setup=[ToolsSetup] begin
     t = 0.005:0.005:1e4
-    x = colorednoise(t, u"s") * u"V"
+    x = colorednoise(t*u"s") * u"V"
     s = spectrum(x)
     xticks = exp10.(range(log10(1), log10(100), length = 5))
 
@@ -28,7 +28,7 @@ end
 
     display(f)
 
-    X = ToolsArray([colorednoise(t[1:10:end], u"s") .* i * u"V" for i in 1:10],
+    X = ToolsArray([colorednoise(t[1:10:end]*u"s") .* i * u"V" for i in 1:10],
                    Var(1:10)) |>
         stack
     S = spectrum(X)
@@ -44,7 +44,7 @@ end
 @testitem "plotspectrum" setup=[ToolsSetup] begin
     using TimeseriesTools, CairoMakie, Unitful
     t = 0.005:0.005:1e5
-    x = colorednoise(t, u"s") * u"V" # ::AbstractTimeseries
+    x = colorednoise(t*u"s") * u"V" # ::AbstractTimeseries
 
     f = Figure()
     ax = Axis(f[1, 1])
