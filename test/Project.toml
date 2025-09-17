@@ -15,4 +15,4 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 Foresight = "0.4"
 Makie = "0.24"
-TimeseriesTools = "0.7, 0.8, 0.9"
+TimeseriesTools = "0.8, 0.9, 0.10"

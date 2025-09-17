@@ -2,6 +2,7 @@
     using CairoMakie
     using DSP
     using Unitful
+    using TimeseriesMakie
     using TimeseriesTools
 end
 
