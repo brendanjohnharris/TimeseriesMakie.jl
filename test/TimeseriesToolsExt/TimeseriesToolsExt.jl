@@ -34,6 +34,18 @@ end
     p = @test_nowarn TimeseriesMakie.shadows(X)
     @test p.plot isa Shadows
 
+    # `shadows!` with a ToolsArray matrix
+    t = 0:0.1:10
+    x2 = ToolsArray(sin.(t), 𝑡(t))
+    y2 = x2 .^ 2
+    z2 = y2 .* x2
+    mat = hcat(parent(x2), parent(y2), parent(z2))
+    Xmat = ToolsArray(mat, (𝑡(t), Var([:x, :y, :z])))
+    f = Figure()
+    ax = Axis3(f[1, 1])
+    p = @test_nowarn shadows!(ax, Xmat; color = :gray, linewidth = 0.1)
+    @test p isa Shadows
+
     # * Trail
     p = @test_nowarn TimeseriesMakie.trail(x, y)
     @test p.plot isa Trail

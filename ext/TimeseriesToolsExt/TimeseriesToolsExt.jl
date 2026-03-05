@@ -52,9 +52,15 @@ function Makie.convert_arguments(P::Type{TimeseriesMakie.Traces},
 end
 function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows}, A::AbstractMatrix)
     if size(A, 2) != 3
-        throw(ArgumentError("Shadows requires a 2D matrix with 3 columns, got $(size(A))"))
+        throw(ArgumentError("`shadows` requires a 2D matrix with 3 columns, got $(size(A))"))
     end
-    return eachcol(A)
+    pts = map(Point3f, eachrow(A))
+    return (pts,)
+end
+
+function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows},
+                                 A::AbstractToolsArray{<:Any, 2})
+    return Makie.convert_arguments(P, parent(A))
 end
 
 include("recipes/spectrumplot.jl")
