@@ -64,5 +64,6 @@ function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows},
 end
 
 include("recipes/spectrumplot.jl")
+include("recipes/neural.jl")
 
 end

@@ -160,3 +160,34 @@ end
 
     save("recipes/traces.png", f)
 end
+
+@testitem "SpikeRaster" setup=[Setup] begin
+    times = [1.0, 2.0, 2.5, 5.0, 6.0, 6.5, 7.0]
+    ids = [1, 2, 1, 3, 2, 3, 1]
+
+    f = Figure(size = (600, 400))
+    spikeraster!(Axis(f[1, 1]; title = "Flat"), times, ids)
+    spikeraster!(Axis(f[1, 2]; title = "Sorted by rate"), times, ids; sortby = :rate, rev = true)
+    spikeraster!(Axis(f[2, 1]; title = "Vector-of-vectors"), [[1.0, 2.0, 4.0], [3.0], Float64[]])
+    spikeraster!(Axis(f[2, 2]; title = "Bool matrix"), [rand() < 0.2 for _ in 1:8, _ in 1:40])
+    save("recipes/spikeraster.png", f)
+    @test isfile("recipes/spikeraster.png")
+end
+
+@testitem "PSTH" setup=[Setup] begin
+    times = repeat(1.0:10.0, inner = 8)
+    f = Figure(size = (600, 200))
+    psth!(Axis(f[1, 1]; title = "Count"), times; binwidth = 1.0, normalization = :count)
+    psth!(Axis(f[1, 2]; title = "Rate"), times; binwidth = 2.0, normalization = :rate)
+    save("recipes/psth.png", f)
+    @test isfile("recipes/psth.png")
+end
+
+@testitem "RateMap" setup=[Setup] begin
+    S = [rand() < 0.15 for _ in 1:20, _ in 1:200]
+    f = Figure(size = (600, 200))
+    ratemap!(Axis(f[1, 1]; title = "Bin index"), S; binwidth = 10)
+    ratemap!(Axis(f[1, 2]; title = "Real time"), collect(1:200) .* 0.1, S; binwidth = 10)
+    save("recipes/ratemap.png", f)
+    @test isfile("recipes/ratemap.png")
+end
