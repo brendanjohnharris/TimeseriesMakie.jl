@@ -239,6 +239,14 @@ end
     spikeraster!(Axis(f[2, 2]; title = "Bool matrix"), [rand() < 0.2 for _ in 1:8, _ in 1:40])
     save("recipes/spikeraster.png", f)
     @test isfile("recipes/spikeraster.png")
+
+    # ids index the y-axis, and a `sortby` vector supplies one key per neuron; both are checked
+    # up front rather than surfacing as a `BoundsError` from the row lookup.
+    @test throws_with(() -> spikeraster([1.0], [0]).plot.ys[], "≥ 1")
+    @test throws_with(() -> spikeraster(times, ids; sortby = [1.0]).plot.ys[], "neurons")
+
+    # a `sortby` function is only handed the neurons that actually spiked
+    @test length(TimeseriesMakie._raster_rows([10, 10, 3], [1.0, 2.0, 0.5], first, false)) == 10
 end
 
 @testitem "PSTH" setup=[Setup] begin
@@ -248,6 +256,11 @@ end
     psth!(Axis(f[1, 2]; title = "Rate"), times; binwidth = 2.0, normalization = :rate)
     save("recipes/psth.png", f)
     @test isfile("recipes/psth.png")
+
+    # unitful spike times: the bin width is compared against `zero(w)`, not a bare `0`
+    @test length(psth((1.0:10.0)u"s").plot.xs[]) > 0
+    @test length(psth(fill(2.0u"s", 5)).plot.xs[]) > 0        # a single distinct time
+    @test length(psth([1.0, NaN, 2.0, 3.0]).plot.xs[]) > 0    # a non-finite time is dropped
 end
 
 @testitem "RateMap" setup=[Setup] begin
@@ -257,4 +270,10 @@ end
     ratemap!(Axis(f[1, 2]; title = "Real time"), collect(1:200) .* 0.1, S; binwidth = 10)
     save("recipes/ratemap.png", f)
     @test isfile("recipes/ratemap.png")
+
+    # a `binwidth` wider than the raster still yields one bin, rather than zero bins and a
+    # `BoundsError` from the empty time axis
+    @test size(ratemap(rand(Bool, 3, 4); binwidth = 10).plot.Z[]) == (1, 3)
+    @test size(ratemap(rand(Bool, 3, 7); binwidth = 2).plot.Z[]) == (3, 3)
+    @test throws_with(() -> ratemap(collect(1.0:3), rand(Bool, 3, 7)).plot.Z[], "columns")
 end

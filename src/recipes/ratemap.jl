@@ -22,9 +22,12 @@ end
 
 function Makie.plot!(plot::RateMap{<:Tuple{<:AbstractVector, <:AbstractMatrix}})
     map!(plot.attributes, [:times, :raster, :binwidth], [:xs, :ys, :Z]) do t, S, binwidth
-        b = binwidth === automatic ? 1 : Int(binwidth)
+        length(t) == size(S, 2) ||
+            throw(DimensionMismatch("`times` has $(length(t)) entries but `raster` has $(size(S, 2)) columns"))
+        b = binwidth === automatic ? 1 : clamp(Int(binwidth), 1, size(S, 2)) # ≥1 bin always
         Zb = _binmean(S, b)                          # neuron × nbins
-        return (_bincenters(t, b), collect(1:size(Zb, 1)), permutedims(Zb))   # → (time, neuron, Z)
+        # ! `ustrip`: a unitful x sends Makie's heatmap conversion into infinite recursion
+        return (ustrip.(_bincenters(t, b)), collect(1:size(Zb, 1)), permutedims(Zb))   # → (time, neuron, Z)
     end
     heatmap!(plot, plot.attributes, plot.xs, plot.ys, plot.Z; rasterize = pop_rasterize!(plot))
     return plot

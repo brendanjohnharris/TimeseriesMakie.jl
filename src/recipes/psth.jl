@@ -31,7 +31,8 @@ function Makie.plot!(plot::PSTH{<:Tuple{<:AbstractVector}})
     map!(plot.attributes, [:times, :binwidth, :normalization, :nneurons],
          [:xs, :ys, :barwidth]) do times, binwidth, normalization, nneurons
         centers, vals, w = _psth_bins(times, binwidth, normalization, nneurons)
-        return (centers, vals, w)
+        # ! `ustrip`: Makie's barplot rejects a unitful axis, and a `:rate` is per unit time
+        return (ustrip.(centers), ustrip.(vals), ustrip(w))
     end
     # no `pop_rasterize!` here: BarPlot is itself a recipe, so `rasterize` warns either way
     barplot!(plot, plot.attributes, plot.xs, plot.ys; width = plot.barwidth)
@@ -40,10 +41,11 @@ end
 
 # bin `times` into non-overlapping bins of width `w`; return (bin centers, normalised values, w).
 function _psth_bins(times, binwidth, normalization, nneurons)
+    times = filter(isfinite, times) # a NaN time would poison `extrema` and the bin count
     isempty(times) && return (Float64[], Float64[], 1.0)
     lo, hi = extrema(times)
     w = binwidth === automatic ? (hi - lo) / 50 : float(binwidth)
-    w = w > 0 ? w : one(w)
+    w > zero(w) || (w = oneunit(w)) # `zero`/`oneunit`, not `0`/`one`: times may carry units
     nb = max(1, ceil(Int, (hi - lo) / w))
     counts = zeros(Int, nb)
     for t in times

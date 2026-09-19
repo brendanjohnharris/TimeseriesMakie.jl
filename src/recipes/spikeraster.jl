@@ -44,6 +44,8 @@ end
 # per-neuron key and rank it (smallest key at the bottom), optionally reversed.
 function _raster_rows(ids, times, sortby, rev)
     nn = isempty(ids) ? 0 : Int(maximum(ids))
+    isempty(ids) || minimum(ids) >= 1 ||
+        throw(ArgumentError("neuron ids index the y-axis and must be ≥ 1; got a minimum of $(minimum(ids))"))
     rows = sortby === false ? collect(1:nn) : invperm(sortperm(_raster_key(ids, times, sortby, nn)))
     rev && (rows = (nn + 1) .- rows)
     return rows
@@ -57,13 +59,20 @@ function _raster_key(ids, times, sortby, nn)
         end
         return key
     elseif sortby isa AbstractVector
+        length(sortby) == nn ||
+            throw(ArgumentError("`sortby` has $(length(sortby)) entries but there are $nn neurons"))
         return collect(sortby)
     elseif sortby isa Function                           # f(neuron's spike-time vector)
-        buckets = [Float64[] for _ in 1:nn]
+        buckets = [eltype(times)[] for _ in 1:nn]
         for (t, id) in zip(times, ids)
             push!(buckets[Int(id)], t)
         end
-        return [sortby(b) for b in buckets]
+        spiking = findall(!isempty, buckets)             # only call `sortby` on neurons that spiked
+        isempty(spiking) && return zeros(nn)
+        ks = float.(map(sortby, buckets[spiking]))
+        key = fill(minimum(ks), nn)                      # silent neurons sort below the rest
+        key[spiking] .= ks
+        return key
     end
     throw(ArgumentError("`sortby` must be `false`, `:rate`, a function, or a vector; got $sortby"))
 end
