@@ -46,17 +46,19 @@ function Makie.plot!(plot::Shadows{<:Tuple{<:AbstractVector{<:Point3}}})
 
         if limits === automatic
             limits = (extrema(_x), extrema(_y), extrema(_z))
+        else
+            limits = map(l -> ustrip.(l), limits) # the points are unitless by conversion
         end
 
         N = length(x)
-        if swapshadows === false
-            swapshadows = (false, false, false)
-        end
         if swapshadows === automatic
             swapshadows = (true, true, false)
+        elseif swapshadows isa Bool
+            swapshadows = (swapshadows, swapshadows, swapshadows)
         end
         planes = map(limits, swapshadows) do l, s
-            p = s ? last(l) .+ eps() : first(l) .- eps()
+            # `eps` of the value, not `eps()`: the limits may be Float32 or carry units
+            p = s ? last(l) + eps(float(last(l))) : first(l) - eps(float(first(l)))
             return fill(p, N)
         end
         if mode === :projection
@@ -74,4 +76,6 @@ function Makie.plot!(plot::Shadows{<:Tuple{<:AbstractVector{<:Point3}}})
     lines!(plot, plot.attributes, plot.ys; rasterize)
     lines!(plot, plot.attributes, plot.zs; rasterize)
 end
-Makie.convert_arguments(::Type{<:Shadows}, x, y, z) = (Point3f.(zip(x, y, z)),)
+# ! `ustrip`: `Point3f` cannot carry units, so unitful coordinates are stripped here
+Makie.convert_arguments(::Type{<:Shadows}, x, y, z) = (Point3f.(zip(ustrip.(x), ustrip.(y),
+                                                                   ustrip.(z))),)

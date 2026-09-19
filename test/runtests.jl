@@ -23,6 +23,7 @@ using TestItemRunner
     using TimeseriesMakie
     using CairoMakie.Makie.Distributions
     using LaTeXStrings
+    using Unitful
 end
 
 @testitem "Kinetic" setup=[Setup] begin
@@ -178,6 +179,16 @@ end
     record(f, "recipes/shadows_animation.mp4", X) do _xyz
         xyz[] = push!(xyz[], _xyz)
     end
+
+    # `swapshadows` is documented to take a single Bool for all three planes, not just a tuple
+    @test shadows(1:10, 1:10, 1:10; swapshadows = true).plot.xs[][1][1] ≈ 10
+    @test shadows(1:10, 1:10, 1:10; swapshadows = false).plot.xs[][1][1] ≈ 1
+    @test shadows(1:10, 1:10, 1:10).plot.xs[][1][1] ≈ 10        # automatic = (true, true, false)
+
+    # unitful coordinates and limits (stripped, since `Point3f` cannot carry units)
+    @test length(shadows((1:5)u"m", (1:5)u"m", (1:5)u"m").plot.xs[]) == 5
+    lims = ((1.0u"m", 5.0u"m"), (1.0u"m", 5.0u"m"), (1.0u"m", 5.0u"m"))
+    @test length(shadows(1:5, 1:5, 1:5; limits = lims).plot.xs[]) == 5
 end
 
 @testitem "Traces" setup=[Setup] begin
