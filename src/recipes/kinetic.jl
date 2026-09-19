@@ -99,6 +99,7 @@ function Makie.plot!(plot::Kinetic{<:Tuple{<:Vector{<:Point{2, T}}}}) where {T <
     map!(plot.attributes, [:x], :final_x) do xy
         interleave(xy)
     end
+    rasterize = pop_rasterize!(plot)
     linesegments!(plot, plot.attributes, plot.final_x;
-                  linewidth = plot.attributes[:linewidths])
+                  linewidth = plot.attributes[:linewidths], rasterize)
 end

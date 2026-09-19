@@ -132,8 +132,9 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
         end
         return (final_x,)
     end
+    rasterize = pop_rasterize!(plot)
     lines!(plot, plot.attributes, plot.final_x; color = plot.final_color,
-           colormap = :viridis, alpha = 1.0)
+           colormap = :viridis, alpha = 1.0, rasterize)
 end
 Makie.convert_arguments(::Type{<:Trail}, x, y) = (Point2.(zip(x, y)),)
 Makie.convert_arguments(::Type{<:Trail}, x, y, z) = (Point3.(zip(x, y, z)),)

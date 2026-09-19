@@ -36,7 +36,7 @@ function Makie.plot!(plot::SpikeRaster{<:Tuple{<:AbstractVector, <:AbstractVecto
         rows = _raster_rows(ids, times, sortby, rev)     # neuron id → y-row
         return (times, [rows[Int(id)] for id in ids])
     end
-    scatter!(plot, plot.attributes, plot.xs, plot.ys)
+    scatter!(plot, plot.attributes, plot.xs, plot.ys; rasterize = pop_rasterize!(plot))
     return plot
 end
 

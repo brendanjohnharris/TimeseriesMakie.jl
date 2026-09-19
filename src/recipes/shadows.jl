@@ -69,8 +69,9 @@ function Makie.plot!(plot::Shadows{<:Tuple{<:AbstractVector{<:Point3}}})
         return (xs, ys, zs)
     end
 
-    lines!(plot, plot.attributes, plot.xs)
-    lines!(plot, plot.attributes, plot.ys)
-    lines!(plot, plot.attributes, plot.zs)
+    rasterize = pop_rasterize!(plot)
+    lines!(plot, plot.attributes, plot.xs; rasterize)
+    lines!(plot, plot.attributes, plot.ys; rasterize)
+    lines!(plot, plot.attributes, plot.zs; rasterize)
 end
 Makie.convert_arguments(::Type{<:Shadows}, x, y, z) = (Point3f.(zip(x, y, z)),)

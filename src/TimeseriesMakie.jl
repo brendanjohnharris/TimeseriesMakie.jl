@@ -35,6 +35,18 @@ maybecolor(x) = x
 
 minmax(x) = (x .- minimum(x)) ./ (maximum(x) - minimum(x))
 minmax(x::Number) = x
+
+"""
+    pop_rasterize!(plot)
+
+Remove `rasterize` from a recipe's `plot.kw` and return it, for forwarding to the child plot.
+
+`rasterize` reaches a plot through `plot.kw` and is registered on it only after `plot!`
+returns. Left on a recipe, CairoMakie treats that recipe as atomic and hands it to an
+unsupported `draw_atomic`: a warning, and no rasterisation. Only worth doing when the child is
+a primitive; giving it to another recipe just moves the problem down a level.
+"""
+pop_rasterize!(plot) = Makie.to_value(pop!(plot.kw, :rasterize, false))
 include("Recipes.jl")
 
 # * Extensions

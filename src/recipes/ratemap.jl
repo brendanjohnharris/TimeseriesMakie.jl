@@ -26,7 +26,7 @@ function Makie.plot!(plot::RateMap{<:Tuple{<:AbstractVector, <:AbstractMatrix}})
         Zb = _binmean(S, b)                          # neuron × nbins
         return (_bincenters(t, b), collect(1:size(Zb, 1)), permutedims(Zb))   # → (time, neuron, Z)
     end
-    heatmap!(plot, plot.attributes, plot.xs, plot.ys, plot.Z)
+    heatmap!(plot, plot.attributes, plot.xs, plot.ys, plot.Z; rasterize = pop_rasterize!(plot))
     return plot
 end
 

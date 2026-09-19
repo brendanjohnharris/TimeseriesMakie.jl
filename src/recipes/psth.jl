@@ -33,6 +33,7 @@ function Makie.plot!(plot::PSTH{<:Tuple{<:AbstractVector}})
         centers, vals, w = _psth_bins(times, binwidth, normalization, nneurons)
         return (centers, vals, w)
     end
+    # no `pop_rasterize!` here: BarPlot is itself a recipe, so `rasterize` warns either way
     barplot!(plot, plot.attributes, plot.xs, plot.ys; width = plot.barwidth)
     return plot
 end

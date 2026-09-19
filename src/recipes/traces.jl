@@ -71,5 +71,6 @@ function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
         return (vcat(xys...),)
     end
 
-    lines!(plot, plot.attributes, plot.final_x; color = plot.final_color)
+    rasterize = pop_rasterize!(plot)
+    lines!(plot, plot.attributes, plot.final_x; color = plot.final_color, rasterize)
 end
