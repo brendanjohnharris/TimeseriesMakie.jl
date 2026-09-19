@@ -46,6 +46,10 @@ _Other attributes are shared with `Makie.Lines`._
 end
 Makie.conversion_trait(::Type{<:Trail}) = Makie.PointBased()
 
+# How many trail points a colour or alpha spec pins down. Only an explicit vector constrains the
+# length; a function is evaluated per point and a scalar is uniform over them.
+_speclength(spec, x) = spec isa AbstractVector ? length(spec) : length(x)
+
 function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
 
     # * Parse colors
@@ -65,20 +69,9 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     # * Compute n_points
     map!(plot.attributes, [:x, :parsed_color, :alpha, :n_points],
          [:final_n_points]) do x, color, alpha, n_points
-        isempty(x) && return 0
+        isempty(x) && return (0,)
 
-        if alpha isa Function
-            nalpha = length(x)
-        elseif eltype(alpha) <: Real
-            nalpha = length(alpha)
-        end
-        if color isa Function
-            ncolor = length(x)
-        elseif eltype(color) <: Real
-            ncolor = length(color)
-        end
-
-        final_n_points = min(length(x), nalpha, ncolor)
+        final_n_points = min(length(x), _speclength(alpha, x), _speclength(color, x))
 
         if n_points != automatic
             final_n_points = min(final_n_points, n_points)
@@ -90,22 +83,30 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     # * Sample colormap
     map!(plot.attributes, [:parsed_color, :parsed_colormap, :final_n_points],
          [:processed_color]) do color, colormap, n_points
-        if color isa Function
-            color = color.(1:n_points)
+        vals = if color isa Function
+            color.(1:n_points)
+        elseif color isa AbstractVector
+            collect(color[(end - n_points + 1):end])
+        elseif color isa Number
+            fill(color, n_points)
         else
-            color = collect(color[(end - n_points + 1):end])
+            throw(ArgumentError("`color` must be a number, a vector of numbers, or a function of the point index; use `linecolor` for a fixed colour"))
         end
-        processed_color = colormap[minmax(color)]
+        processed_color = colormap[minmax(vals)]
         return (processed_color,)
     end
 
     # * Sample alphamap
     map!(plot.attributes, [:alpha, :final_n_points],
          [:processed_alpha]) do alpha, n_points
-        if alpha isa Function
-            alpha_vals = alpha.(1:n_points) |> minmax
+        alpha_vals = if alpha isa Function
+            alpha.(1:n_points) |> minmax
+        elseif alpha isa AbstractVector
+            collect(alpha[(end - n_points + 1):end])
+        elseif alpha isa Number
+            fill(float(alpha), n_points) # a scalar is a uniform alpha, not a profile to normalise
         else
-            alpha_vals = collect(alpha[(end - n_points + 1):end])
+            throw(ArgumentError("`alpha` must be a number, a vector of numbers, or a function of the point index"))
         end
         return (alpha_vals,)
     end

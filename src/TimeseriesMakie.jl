@@ -2,6 +2,7 @@ module TimeseriesMakie
 
 using Makie
 using Random
+using Makie.Unitful
 
 # ? Format recipe docstrings
 using Makie.DocStringExtensions
@@ -33,7 +34,19 @@ MakieColor = Union{<:MColor, <:Tuple{<:MColor, <:Number}}
 maybecolor(x::MakieColor) = Makie.to_color(x)
 maybecolor(x) = x
 
-minmax(x) = (x .- minimum(x)) ./ (maximum(x) - minimum(x))
+"""
+    minmax(x)
+
+Normalise `x` onto `[0, 1]`. A constant `x` has no ordering to normalise, so it maps to the
+middle of the range rather than to `0/0`; callers use the result to index colormaps and
+alpha profiles, where a `NaN` silently renders nothing.
+"""
+function minmax(x)
+    isempty(x) && return float.(x)
+    lo, hi = extrema(x)
+    lo == hi && return fill(0.5, size(x))
+    return (x .- lo) ./ (hi - lo)
+end
 minmax(x::Number) = x
 
 """

@@ -46,37 +46,29 @@ function interleave(x)
     end
     return segments
 end
+# number of segments `interleave` emits; a lone point still gets one (degenerate) segment
+nsegments(n) = max(1, n - 1)
+
+# map a profile onto the 1-11 width range. A constant profile lands mid-range (see `minmax`),
+# so a straight line draws at a uniform width instead of vanishing behind `NaN`.
+towidths(l) = minmax(l) .* 10 .+ 1
+
 function minter(x)
+    length(x) < 2 && return towidths(ones(1))
     l = map(eachindex(x)) do i
-        if i == 1
-            x[1]
-        else
-            mean(x[(i - 1):i])
-        end
+        i == 1 ? x[1] : (x[i - 1] + x[i]) / 2
     end
-    l = l .- minimum(l)
-    l = l ./ maximum(l)
-    l .*= 10
-    l .+= 1
-    return l[2:end]
+    return towidths(l)[2:end]
 end
 
 function difter(x)
+    n = length(x)
+    n < 3 && return towidths(ones(nsegments(n))) # curvature needs three points
     l = map(eachindex(x)) do i
-        if i < 2
-            x[3] - 2 * x[2] + x[1]
-        elseif i > length(x) - 1
-            x[end - 2] - 2 * x[end - 1] + x[end]
-        else
-            x[i + 1] - 2 * x[i] + x[i - 1]
-        end
+        j = clamp(i, 2, n - 1) # reuse the end curvatures for the endpoints
+        x[j + 1] - 2 * x[j] + x[j - 1]
     end
-    l = exp.(-abs.(l) .^ 2)
-    l = l .- minimum(l)
-    l = l ./ maximum(l)
-    l .*= 10
-    l .+= 1
-    return l[2:end]
+    return towidths(exp.(-abs.(l) .^ 2))[2:end]
 end
 
 function Makie.plot!(plot::Kinetic{<:Tuple{<:Vector{<:Point{2, T}}}}) where {T <: Real}
@@ -85,7 +77,7 @@ function Makie.plot!(plot::Kinetic{<:Tuple{<:Vector{<:Point{2, T}}}}) where {T <
         x = map(first, xy)
         y = map(last, xy)
         if l isa Number
-            l = fill(l, length(x) - 1)
+            l = fill(l, nsegments(length(x)))
         elseif l === :x
             l = minter(x)
         elseif l === :y

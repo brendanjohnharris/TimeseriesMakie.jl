@@ -5,6 +5,17 @@ using TestItemRunner
 @run_package_tests
 
 @testsnippet Setup begin
+    # Makie wraps errors raised inside a recipe's `map!` in a `ResolveException`, so match on the
+    # message rather than the type.
+    function throws_with(f, msg)
+        try
+            f()
+            return false
+        catch e
+            return occursin(msg, sprint(showerror, e))
+        end
+    end
+
     using CairoMakie
     using CairoMakie.Makie.PlotUtils
     using Statistics
@@ -22,6 +33,20 @@ end
     kinetic!(ax, x, y; linewidthscale = 0.5, linewidth = :curv, linecap = :round)
     display(f)
     save("recipes/kinetic.png", f)
+
+    # A constant width profile (a straight line, or any curve of constant curvature) has no
+    # variation to normalise; it must draw at a uniform width rather than at `NaN`.
+    for mode in (:curv, :x, :y)
+        w = kinetic(1:10, 1:10; linewidth = mode).plot.linewidths[]
+        @test length(w) == 18 && all(isfinite, w)
+    end
+    @test allequal(kinetic(1:10, (1:10) .^ 2).plot.linewidths[])
+    @test !allequal(kinetic(x, y).plot.linewidths[])           # a real curve still varies
+
+    # too few points to define a curvature, and a lone point's degenerate segment
+    @test length(kinetic([0.0, 1.0], [0.0, 2.0]).plot.linewidths[]) == 2
+    @test length(kinetic([0.0], [0.0]).plot.linewidths[]) == 2
+    @test length(kinetic(1:10, 1:10; linewidth = 3).plot.linewidths[]) == 18
 end
 
 @testitem "Trail 2D" setup=[Setup] begin
@@ -63,6 +88,23 @@ end
     record(f, "recipes/trail_animation.mp4", zip(x, y)) do _xy
         xy[] = push!(xy[], Point2f(_xy))
     end
+
+    # A scalar alpha is a uniform transparency, not a profile: it must not be normalised, and
+    # must not be read as a one-element collection that truncates the trail.
+    p = trail(1:10, 1:10; alpha = 0.5).plot
+    @test p.final_n_points[] == 10
+    @test all(==(0.5), p.processed_alpha[])
+    @test trail(1:10, 1:10; alpha = identity).plot.processed_alpha[][[1, end]] == [0.0, 1.0]
+
+    # A constant colour vector has no range to normalise; it must pick one real colour rather
+    # than a transparent `NaN` sample.
+    c = trail(1:10, 1:10; color = ones(10)).plot.final_color[]
+    rgb(q) = (q.r, q.g, q.b)
+    @test allequal(rgb.(c))
+    @test any(!=((0, 0, 0)), rgb.(c))
+    @test !allequal(rgb.(trail(1:10, 1:10; color = collect(1.0:10)).plot.final_color[]))
+
+    @test throws_with(() -> trail(1:10, 1:10; color = :red).plot.final_color[], "must be a number")
 end
 
 @testitem "Trajectory" setup=[Setup] begin
