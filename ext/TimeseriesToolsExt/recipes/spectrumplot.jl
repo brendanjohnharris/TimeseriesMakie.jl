@@ -160,7 +160,7 @@ function Makie.plot!(plot::SpectrumPlot{<:Tuple{AbstractVector,
               alpha = plot[:bandalpha])
     end
     lines!(plot, plot.attributes, plot.attributes[:x], plot.attributes[:y])
-    scatter!(plot.attributes, plot.attributes[:p])
+    scatter!(plot, plot.attributes, plot.attributes[:p])
     text!(plot, plot.attributes, plot[:p]; text = plot[:t], color = plot[:textcolor])
 end
 
