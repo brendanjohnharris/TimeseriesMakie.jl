@@ -201,6 +201,20 @@ end
     Colorbar(f[1, 6], p)
 
     save("recipes/traces.png", f)
+
+    # A numeric spacing stacks cumulatively, as `:even` and `:close` do; it is a gap between
+    # neighbours, not one constant offset applied to every trace.
+    Z0 = repeat(collect(1.0:5), 1, 3)
+    @test vec(minimum(traces(1:5, 1:3, Z0; spacing = 10.0).plot.stacked_Z[], dims = 1)) ==
+          [1.0, 11.0, 21.0]
+    @test vec(minimum(traces(1:5, 1:3, Z0).plot.stacked_Z[], dims = 1)) == [1.0, 1.0, 1.0]
+    @test length(traces(1:5, 1:1, zeros(5, 1); spacing = :even).plot.stacked_Z[]) == 5
+    @test throws_with(() -> traces(1:5, 1:3, zeros(5, 3); spacing = :nope).plot.stacked_Z[],
+                      "must be a number")
+
+    # colours are generated per plotted point, and the points are `zip`ped to the shorter of the two
+    p = traces(1:5, 1:2, zeros(10, 2))
+    @test length(p.plot.final_x[]) == length(p.plot.final_color[])
 end
 
 @testitem "SpikeRaster" setup=[Setup] begin

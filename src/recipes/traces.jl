@@ -1,5 +1,3 @@
-using Makie.Unitful
-
 """
     traces(x, y, Z; kwargs...)
 Plot the columns of `Z` over the domain `x`, colored by `y`.
@@ -28,9 +26,10 @@ end
 
 function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
                                           <:AbstractMatrix}})
-    map!(plot.attributes, [:linecolor, :y, :Z], [:final_color]) do color, y, Z
+    map!(plot.attributes, [:linecolor, :x, :y, :Z], [:final_color]) do color, x, y, Z
         if color === automatic
-            cs = repeat(y', size(Z, 1))
+            n = min(length(x), size(Z, 1)) # `final_x` zips x with each column, so it truncates too
+            cs = repeat(y', n)
             cs = vcat(cs, fill(NaN, 1, size(cs, 2)))
             return (Iterators.flatten(cs) |> collect,)
         else
@@ -41,7 +40,9 @@ function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
     map!(plot.attributes, [:Z, :spacing, :offset], [:stacked_Z]) do Z, spacing, offset
         c = zeros(size(Z, 2)) .* unit(eltype(Z))
         if spacing isa Symbol
-            if spacing === :even
+            spacing in (:even, :close) ||
+                throw(ArgumentError("`spacing` must be a number, `:even` or `:close`; got `:$spacing`"))
+            if spacing === :even && size(Z, 2) > 1
                 # * Space is the difference between the minimum of 2 and the maximum of 1
                 space = maximum([minimum(Z[:, i]) - maximum(Z[:, i - 1])
                                  for i in axes(Z, 2)[2:end]])
@@ -56,7 +57,7 @@ function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
             if unit(spacing) === NoUnits
                 spacing = spacing * unit(eltype(Z))
             end
-            c .= spacing .* offset
+            c .= (0:(length(c) - 1)) .* (spacing * offset) # cumulative, as for the symbolic modes
         end
         stacked_Z = Z .+ c'
         return (stacked_Z,)
