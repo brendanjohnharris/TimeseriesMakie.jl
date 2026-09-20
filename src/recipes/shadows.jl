@@ -1,4 +1,3 @@
-
 """
     shadows(x, y, z; kwargs...)
 Plots shadows of a 3D trajectory onto the enclosing axis panes.
@@ -38,8 +37,10 @@ end
 Makie.conversion_trait(::Type{<:Shadows}) = Makie.PointBased()
 
 function Makie.plot!(plot::Shadows{<:Tuple{<:AbstractVector{<:Point3}}})
-    map!(plot.attributes, [:x, :mode, :swapshadows, :limits],
-         [:xs, :ys, :zs]) do x, mode, swapshadows, limits
+    map!(
+        plot.attributes, [:x, :mode, :swapshadows, :limits],
+        [:xs, :ys, :zs]
+    ) do x, mode, swapshadows, limits
         _x = map(Base.Fix2(getindex, 1), x)
         _y = map(Base.Fix2(getindex, 2), x)
         _z = map(Base.Fix2(getindex, 3), x)
@@ -74,8 +75,14 @@ function Makie.plot!(plot::Shadows{<:Tuple{<:AbstractVector{<:Point3}}})
     rasterize = pop_rasterize!(plot)
     lines!(plot, plot.attributes, plot.xs; rasterize)
     lines!(plot, plot.attributes, plot.ys; rasterize)
-    lines!(plot, plot.attributes, plot.zs; rasterize)
+    return lines!(plot, plot.attributes, plot.zs; rasterize)
 end
 # ! `ustrip`: `Point3f` cannot carry units, so unitful coordinates are stripped here
-Makie.convert_arguments(::Type{<:Shadows}, x, y, z) = (Point3f.(zip(ustrip.(x), ustrip.(y),
-                                                                   ustrip.(z))),)
+Makie.convert_arguments(::Type{<:Shadows}, x, y, z) = (
+    Point3f.(
+        zip(
+            ustrip.(x), ustrip.(y),
+            ustrip.(z)
+        )
+    ),
+)

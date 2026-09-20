@@ -6,13 +6,13 @@
     using TimeseriesTools
 end
 
-@testitem "Tools default" setup=[ToolsSetup] begin
+@testitem "Tools default" setup = [ToolsSetup] begin
     x = colorednoise(0.1:0.1:12)
     p = plot(x)
     @test p.plot isa Makie.Lines
 end
 
-@testitem "Tools compatibility" setup=[ToolsSetup] begin
+@testitem "Tools compatibility" setup = [ToolsSetup] begin
     # * Traces
     x = ToolsArray([colorednoise(0.1:0.1:12) for i in 1:6], Var(1:6)) |> stack
     p = @test_nowarn TimeseriesMakie.traces(decompose(x)...)

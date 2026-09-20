@@ -28,8 +28,10 @@ _Other attributes are shared with `Makie.BarPlot`._
 end
 
 function Makie.plot!(plot::PSTH{<:Tuple{<:AbstractVector}})
-    map!(plot.attributes, [:times, :binwidth, :normalization, :nneurons],
-         [:xs, :ys, :barwidth]) do times, binwidth, normalization, nneurons
+    map!(
+        plot.attributes, [:times, :binwidth, :normalization, :nneurons],
+        [:xs, :ys, :barwidth]
+    ) do times, binwidth, normalization, nneurons
         centers, vals, w = _psth_bins(times, binwidth, normalization, nneurons)
         # ! `ustrip`: Makie's barplot rejects a unitful axis, and a `:rate` is per unit time
         return (ustrip.(centers), ustrip.(vals), ustrip(w))

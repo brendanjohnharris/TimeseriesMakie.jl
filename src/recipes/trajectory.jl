@@ -41,7 +41,7 @@ function Makie.plot!(plot::Trajectory{<:Tuple{<:AbstractVector{<:Point}}})
         return (parsed_color,)
     end
     rasterize = pop_rasterize!(plot)
-    lines!(plot, plot.attributes, plot.x; color = plot.parsed_color, rasterize)
+    return lines!(plot, plot.attributes, plot.x; color = plot.parsed_color, rasterize)
 end
 Makie.convert_arguments(::Type{<:Trajectory}, x, y) = (Point2.(zip(x, y)),)
 Makie.convert_arguments(::Type{<:Trajectory}, x, y, z) = (Point3.(zip(x, y, z)),)

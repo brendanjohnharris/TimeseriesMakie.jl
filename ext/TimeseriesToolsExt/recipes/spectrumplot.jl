@@ -32,20 +32,32 @@ import TimeseriesTools: median, quantile
 
     get_drop_attrs(Lines, [:cycle])...
     get_drop_attrs(Scatter, attribute_names(Lines))...
-    get_drop_attrs(Makie.Text,
-                   [attribute_names(Scatter)..., attribute_names(Lines)..., :align])...
-    get_drop_attrs(Makie.Band,
-                   [
-                       attribute_names(Scatter)...,
-                       attribute_names(Lines)...,
-                       attribute_names(Makie.Text)...
-                   ])...
+    get_drop_attrs(
+        Makie.Text,
+        [attribute_names(Scatter)..., attribute_names(Lines)..., :align]
+    )...
+    get_drop_attrs(
+        Makie.Band,
+        [
+            attribute_names(Scatter)...,
+            attribute_names(Lines)...,
+            attribute_names(Makie.Text)...,
+        ]
+    )...
 end
 
-function Makie.plot!(plot::SpectrumPlot{<:Tuple{AbstractVector,
-                                                AbstractArray}})
-    map!(plot.attributes, [:f, :s, :nonnegative, :average, :width],
-         [:x, :y, :yl, :yu, :doband]) do f, s, nn, average, width
+function Makie.plot!(
+        plot::SpectrumPlot{
+            <:Tuple{
+                AbstractVector,
+                AbstractArray,
+            },
+        }
+    )
+    map!(
+        plot.attributes, [:f, :s, :nonnegative, :average, :width],
+        [:x, :y, :yl, :yu, :doband]
+    ) do f, s, nn, average, width
         if size(s, 2) == 1 # We are ok with units, no band
             doband = false
         else
@@ -57,8 +69,10 @@ function Makie.plot!(plot::SpectrumPlot{<:Tuple{AbstractVector,
             if width isa Function
                 width = map(width, eachrow(s))
             elseif width isa Tuple{Function, Function}
-                width = (map(width[1], eachrow(s)),
-                         map(width[2], eachrow(s)))
+                width = (
+                    map(width[1], eachrow(s)),
+                    map(width[2], eachrow(s)),
+                )
             end
             y = map(average, eachrow(s))
         else
@@ -155,28 +169,30 @@ function Makie.plot!(plot::SpectrumPlot{<:Tuple{AbstractVector,
         return (bandcolor,)
     end
     if plot.doband[]
-        band!(plot, plot.attributes, plot[:x], plot[:yl], plot[:yu];
-              color = plot[:parsed_bandcolor],
-              alpha = plot[:bandalpha])
+        band!(
+            plot, plot.attributes, plot[:x], plot[:yl], plot[:yu];
+            color = plot[:parsed_bandcolor],
+            alpha = plot[:bandalpha]
+        )
     end
     lines!(plot, plot.attributes, plot.attributes[:x], plot.attributes[:y])
     scatter!(plot, plot.attributes, plot.attributes[:p])
-    text!(plot, plot.attributes, plot[:p]; text = plot[:t], color = plot[:textcolor])
+    return text!(plot, plot.attributes, plot[:p]; text = plot[:t], color = plot[:textcolor])
 end
 
 function Makie.convert_arguments(::Type{<:SpectrumPlot}, xy::AbstractVector{<:Point2})
-    (map(first, xy), map(last, xy))
+    return (map(first, xy), map(last, xy))
 end
 
 function Makie.convert_arguments(::Type{<:SpectrumPlot}, x::UnivariateSpectrum)
-    decompose(x)
+    return decompose(x)
 end
 function Makie.convert_arguments(::Type{<:SpectrumPlot}, X::MultivariateSpectrum)
-    (lookup(X, 𝑓), parent(X))
+    return (lookup(X, 𝑓), parent(X))
 end
 
 function Makie.convert_arguments(::Type{<:SpectrumPlot}, x::AbstractTimeseries)
-    Makie.convert_arguments(SpectrumPlot, spectrum(x))
+    return Makie.convert_arguments(SpectrumPlot, spectrum(x))
 end
 
 TimeseriesMakie.spectrumplot(args...; kwargs...) = spectrumplot(args...; kwargs...)
@@ -194,8 +210,10 @@ function label_spectrum!(ax, f, s)
         ms = s
     end
     idxs = (f .> 0) .& (ms .> 0)
-    setlims = ((minimum(f[idxs]), maximum(f[idxs])),
-               (minimum(ms[idxs]), nothing))
+    setlims = (
+        (minimum(f[idxs]), maximum(f[idxs])),
+        (minimum(ms[idxs]), nothing),
+    )
 
     xax = first(ax.limits[])
     yax = last(ax.limits[])
@@ -215,24 +233,26 @@ function label_spectrum!(ax, f, s)
     ax.yscale = log10
     uf == NoUnits ? (ax.xlabel = "Frequency") : (ax.xlabel = "Frequency ($uf)")
     ux == NoUnits ? (ax.ylabel = "Spectral density") :
-    (ax.ylabel = "Spectral density ($ux)")
+        (ax.ylabel = "Spectral density ($ux)")
     return f, s
 end
 """
     plotspectrum!(ax::Axis, x::UnivariateSpectrum)
 Plot the given spectrum, labelling the axes, adding units if appropriate, and other niceties.
 """
-function TimeseriesMakie.plotspectrum!(ax::Makie.Axis, s::UnivariateSpectrum;
-                                       nonnegative = true, kwargs...)
+function TimeseriesMakie.plotspectrum!(
+        ax::Makie.Axis, s::UnivariateSpectrum;
+        nonnegative = true, kwargs...
+    )
     f, s = decompose(s)
     f, s = label_spectrum!(ax, f, s)
-    spectrumplot!(ax, f, s; nonnegative, kwargs...)
+    return spectrumplot!(ax, f, s; nonnegative, kwargs...)
 end
 function TimeseriesMakie.plotspectrum(s; axis = (), kwargs...)
     f = Figure()
     ax = Axis(f[1, 1]; xscale = log10, yscale = log10, axis...)
     p = TimeseriesMakie.plotspectrum!(ax, s; kwargs...)
-    Makie.FigureAxisPlot(f, ax, p)
+    return Makie.FigureAxisPlot(f, ax, p)
 end
 
 """
@@ -242,7 +262,7 @@ Plot the given spectrum, labelling the axes, adding units if appropriate, and ad
 function TimeseriesMakie.plotspectrum!(ax::Makie.Axis, s::MultivariateSpectrum; kwargs...)
     f, v, s = decompose(s)
     f, s = label_spectrum!(ax, f, s)
-    spectrumplot!(ax, f, s; nonnegative = true, kwargs...)
+    return spectrumplot!(ax, f, s; nonnegative = true, kwargs...)
 end
 
 """

@@ -53,8 +53,10 @@ _speclength(spec, x) = spec isa AbstractVector ? length(spec) : length(x)
 function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
 
     # * Parse colors
-    map!(plot.attributes, [:linecolor, :color, :colormap],
-         [:parsed_color, :parsed_colormap]) do linecolor, color, colormap
+    map!(
+        plot.attributes, [:linecolor, :color, :colormap],
+        [:parsed_color, :parsed_colormap]
+    ) do linecolor, color, colormap
         if isnothing(color) # Color and colormap are unused
             parsed_color = identity
             parsed_colormap = cgrad([maybecolor(linecolor)])
@@ -67,8 +69,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     end
 
     # * Compute n_points
-    map!(plot.attributes, [:x, :parsed_color, :alpha, :n_points],
-         [:final_n_points]) do x, color, alpha, n_points
+    map!(
+        plot.attributes, [:x, :parsed_color, :alpha, :n_points],
+        [:final_n_points]
+    ) do x, color, alpha, n_points
         isempty(x) && return (0,)
 
         final_n_points = min(length(x), _speclength(alpha, x), _speclength(color, x))
@@ -81,8 +85,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     end
 
     # * Sample colormap
-    map!(plot.attributes, [:parsed_color, :parsed_colormap, :final_n_points],
-         [:processed_color]) do color, colormap, n_points
+    map!(
+        plot.attributes, [:parsed_color, :parsed_colormap, :final_n_points],
+        [:processed_color]
+    ) do color, colormap, n_points
         vals = if color isa Function
             color.(1:n_points)
         elseif color isa AbstractVector
@@ -97,8 +103,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     end
 
     # * Sample alphamap
-    map!(plot.attributes, [:alpha, :final_n_points],
-         [:processed_alpha]) do alpha, n_points
+    map!(
+        plot.attributes, [:alpha, :final_n_points],
+        [:processed_alpha]
+    ) do alpha, n_points
         alpha_vals = if alpha isa Function
             alpha.(1:n_points) |> minmax
         elseif alpha isa AbstractVector
@@ -112,8 +120,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     end
 
     # * Blend alpha
-    map!(plot.attributes, [:processed_color, :processed_alpha],
-         [:final_color]) do color, alpha
+    map!(
+        plot.attributes, [:processed_color, :processed_alpha],
+        [:final_color]
+    ) do color, alpha
         final_color = map(color, alpha) do c, a
             Makie.coloralpha(c, c.alpha * a)
         end
@@ -121,8 +131,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
     end
 
     # * Trim points
-    map!(plot.attributes, [:x, :final_n_points],
-         [:final_x]) do x, n_points
+    map!(
+        plot.attributes, [:x, :final_n_points],
+        [:final_x]
+    ) do x, n_points
         if isempty(x)
             final_x = x
         elseif n_points == 1
@@ -134,8 +146,10 @@ function Makie.plot!(plot::Trail{<:Tuple{<:AbstractVector{<:Point}}})
         return (final_x,)
     end
     rasterize = pop_rasterize!(plot)
-    lines!(plot, plot.attributes, plot.final_x; color = plot.final_color,
-           colormap = :viridis, alpha = 1.0, rasterize)
+    return lines!(
+        plot, plot.attributes, plot.final_x; color = plot.final_color,
+        colormap = :viridis, alpha = 1.0, rasterize
+    )
 end
 Makie.convert_arguments(::Type{<:Trail}, x, y) = (Point2.(zip(x, y)),)
 Makie.convert_arguments(::Type{<:Trail}, x, y, z) = (Point3.(zip(x, y, z)),)

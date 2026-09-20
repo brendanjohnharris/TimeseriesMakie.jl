@@ -33,21 +33,25 @@ for DD in (AbstractToolsVector, AbstractToolsMatrix, AbstractToolsArray{<:Any, 3
     p = _plottype(DD)
     f = Makie.plotkey(p)
     f! = Symbol(f, '!')
-    eval(quote
-             Makie.plot(dd::MayObs{$DD}; kwargs...) = Makie.$f(dd; kwargs...)
-             function Makie.plot(fig::MakieGrids, dd::MayObs{$DD}; kwargs...)
-                 Makie.$f(fig, dd; kwargs...)
-             end
-             Makie.plot!(ax, dd::MayObs{$DD}; kwargs...) = Makie.$f!(ax, dd; kwargs...)
-         end)
+    eval(
+        quote
+            Makie.plot(dd::MayObs{$DD}; kwargs...) = Makie.$f(dd; kwargs...)
+            function Makie.plot(fig::MakieGrids, dd::MayObs{$DD}; kwargs...)
+                return Makie.$f(fig, dd; kwargs...)
+            end
+            Makie.plot!(ax, dd::MayObs{$DD}; kwargs...) = Makie.$f!(ax, dd; kwargs...)
+        end
+    )
 end
 
 # * Conversions
 function Makie.convert_arguments(::Type{<:AbstractPlot}, x::AbstractToolsVector{<:Point})
-    parent(x) |> tuple
+    return parent(x) |> tuple
 end
-function Makie.convert_arguments(P::Type{TimeseriesMakie.Traces},
-                                 A::DimensionalData.AbstractDimMatrix)
+function Makie.convert_arguments(
+        P::Type{TimeseriesMakie.Traces},
+        A::DimensionalData.AbstractDimMatrix
+    )
     return decompose(A)
 end
 function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows}, A::AbstractMatrix)
@@ -58,8 +62,10 @@ function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows}, A::AbstractMa
     return (pts,)
 end
 
-function Makie.convert_arguments(P::Type{TimeseriesMakie.Shadows},
-                                 A::AbstractToolsArray{<:Any, 2})
+function Makie.convert_arguments(
+        P::Type{TimeseriesMakie.Shadows},
+        A::AbstractToolsArray{<:Any, 2}
+    )
     return Makie.convert_arguments(P, parent(A))
 end
 

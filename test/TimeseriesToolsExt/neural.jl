@@ -1,4 +1,4 @@
-@testitem "Tools spike recipes" setup=[ToolsSetup] begin
+@testitem "Tools spike recipes" setup = [ToolsSetup] begin
     # a binary Neuron × Time spike train as a labelled ToolsArray (Var stands in for the neuron axis)
     nN, nT = 8, 100
     A = [rand() < 0.1 for _ in 1:nN, _ in 1:nT]

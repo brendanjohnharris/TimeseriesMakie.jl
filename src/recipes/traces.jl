@@ -24,8 +24,14 @@ _Other attributes are shared with `Makie.Lines`._
     get_drop_attrs(Lines, [:color])...
 end
 
-function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
-                                          <:AbstractMatrix}})
+function Makie.plot!(
+        plot::Traces{
+            <:Tuple{
+                <:AbstractVector, <:AbstractVector,
+                <:AbstractMatrix,
+            },
+        }
+    )
     map!(plot.attributes, [:linecolor, :x, :y, :Z], [:final_color]) do color, x, y, Z
         if color === automatic
             n = min(length(x), size(Z, 1)) # `final_x` zips x with each column, so it truncates too
@@ -44,8 +50,12 @@ function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
                 throw(ArgumentError("`spacing` must be a number, `:even` or `:close`; got `:$spacing`"))
             if spacing === :even && size(Z, 2) > 1
                 # * Space is the difference between the minimum of 2 and the maximum of 1
-                space = maximum([minimum(Z[:, i]) - maximum(Z[:, i - 1])
-                                 for i in axes(Z, 2)[2:end]])
+                space = maximum(
+                    [
+                        minimum(Z[:, i]) - maximum(Z[:, i - 1])
+                            for i in axes(Z, 2)[2:end]
+                    ]
+                )
             end
             for i in axes(Z, 2)[2:end]
                 if spacing === :close
@@ -73,5 +83,5 @@ function Makie.plot!(plot::Traces{<:Tuple{<:AbstractVector, <:AbstractVector,
     end
 
     rasterize = pop_rasterize!(plot)
-    lines!(plot, plot.attributes, plot.final_x; color = plot.final_color, rasterize)
+    return lines!(plot, plot.attributes, plot.final_x; color = plot.final_color, rasterize)
 end
