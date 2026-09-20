@@ -38,8 +38,10 @@ their full width.
 no effect.
 
 - `:auto` - `:lines` on GLMakie and WGLMakie, `:mesh` on every other backend
-- `:mesh` - a triangle stroke built in pixel space. Continuous taper, uniform transparency and a
-  width isotropic in pixels on any axis, on every backend; caps and joins are always round
+- `:mesh` - a stroke built in pixel space. Continuous taper, uniform transparency and a width
+  isotropic in pixels on any axis, on every backend; caps and joins are always round. A uniform
+  colour draws as a single filled outline, which CairoMakie anti-aliases; a per-point colour
+  needs triangles, which it paints through a Cairo mesh pattern and leaves with hard edges
 - `:lines` - a single `lines` carrying one width per point. Renders as `:mesh` does on GLMakie
   and WGLMakie, which stroke a varying width natively; CairoMakie cannot, and errors
 - `:segments` - a `linesegments` with one width per segment, hiding the joints behind `linecap`.
@@ -284,7 +286,7 @@ function strokemesh(P::AbstractVector{<:Point2}, w::AbstractVector)
         m = length(V)
         push!(V, a, b, c)
         push!(S, i, j, k)
-        push!(F, Face(m + 1, m + 2, m + 3))
+        return push!(F, Face(m + 1, m + 2, m + 3))
     end
     rot(v, θ) = Point2f(v[1] * cos(θ) - v[2] * sin(θ), v[1] * sin(θ) + v[2] * cos(θ))
     function dir(a, b) # unit direction; `nothing` for a degenerate or NaN segment
@@ -296,9 +298,12 @@ function strokemesh(P::AbstractVector{<:Point2}, w::AbstractVector)
         step = 2 * acos(clamp(1 - 0.2 / norm(v0), -1, 1))
         k = max(1, ceil(Int, abs(sweep) / step))
         for j in 1:k
-            tri!(P[i], P[i] + rot(v0, sweep * (j - 1) / k), P[i] + rot(v0, sweep * j / k),
-                 i, i, i)
+            tri!(
+                P[i], P[i] + rot(v0, sweep * (j - 1) / k), P[i] + rot(v0, sweep * j / k),
+                i, i, i
+            )
         end
+        return
     end
     n == 0 && return V, F, S
     if n == 1 # a lone point draws as a dot
@@ -330,15 +335,102 @@ function strokemesh(P::AbstractVector{<:Point2}, w::AbstractVector)
     return V, F, S
 end
 
+"""
+    strokeoutline(P, w) -> Vector{Vector{Point2f}}
+
+Closed outlines for a variable-width stroke through the pixel-space points `P`, `w[i]` pixels
+wide at `P[i]`. One ring per run of finite points: up one offset, round the far cap, back down
+the other, round the near cap, with a fan at each vertex on whichever side the turn opens a gap.
+
+Filled by the nonzero winding rule, a ring that crosses itself fills its union, so a turn
+tighter than the half width, or a path that doubles back over itself, stays solid.
+
+This is [`strokemesh`](@ref) without the interior edges, which is what lets CairoMakie
+anti-alias it: it paints a mesh through a Cairo mesh pattern, which is not anti-aliased, while
+a filled path is. The cost is that one ring carries one colour.
+"""
+function strokeoutline(P::AbstractVector{<:Point2}, w::AbstractVector)
+    rings = Vector{Point2f}[]
+    rot(v, θ) = Point2f(v[1] * cos(θ) - v[2] * sin(θ), v[1] * sin(θ) + v[2] * cos(θ))
+    function arc!(out, c, v0, sweep) # within 0.2 px of the true arc, first point excluded
+        step = 2 * acos(clamp(1 - 0.2 / max(norm(v0), 1.0e-6), -1, 1))
+        k = max(1, ceil(Int, abs(sweep) / step))
+        for j in 1:k
+            push!(out, Point2f(c + rot(v0, sweep * j / k)))
+        end
+        return out
+    end
+    nrm(d) = Point2f(-d[2], d[1])
+    finite(p) = isfinite(p[1]) && isfinite(p[2])
+
+    i = 1
+    n = length(P)
+    while i <= n
+        if !finite(P[i])
+            i += 1
+            continue
+        end
+        idx = Int[i] # one unbroken run, with consecutive duplicates dropped so every
+        j = i + 1    # segment has a direction
+        while j <= n && finite(P[j])
+            norm(P[j] - P[idx[end]]) > 1.0e-9 && push!(idx, j)
+            j += 1
+        end
+        i = j + 1
+
+        m = length(idx)
+        if m == 1 # a lone point draws as a dot
+            k = idx[1]
+            v0 = Point2f(0, w[k] / 2)
+            push!(rings, arc!(Point2f[Point2f(P[k] + v0)], P[k], v0, Float32(2π)))
+            continue
+        end
+        d = [normalize(P[idx[t + 1]] - P[idx[t]]) for t in 1:(m - 1)]
+        L = Point2f[]
+        R = Point2f[]
+        for t in 1:m
+            k = idx[t]
+            r = w[k] / 2
+            if t == 1 || t == m
+                mm = nrm(d[t == 1 ? 1 : m - 1]) * r
+                push!(L, Point2f(P[k] + mm))
+                push!(R, Point2f(P[k] - mm))
+            else
+                mp, mn = nrm(d[t - 1]) * r, nrm(d[t]) * r
+                ang = atan(
+                    d[t - 1][1] * d[t][2] - d[t - 1][2] * d[t][1],
+                    clamp(dot(d[t - 1], d[t]), -1, 1)
+                ) # signed turn
+                push!(L, Point2f(P[k] + mp))
+                ang < 0 && arc!(L, P[k], mp, ang)  # turning right, so the left side is outer
+                push!(L, Point2f(P[k] + mn))
+                push!(R, Point2f(P[k] - mp))
+                ang > 0 && arc!(R, P[k], -mp, ang) # turning left, so the right side is outer
+                push!(R, Point2f(P[k] - mn))
+            end
+        end
+        # rotating a normal by -π/2 gives the tangent, so a -π sweep carries each cap around
+        # the end of the stroke rather than back across it
+        ring = arc!(copy(L), P[idx[m]], nrm(d[m - 1]) * (w[idx[m]] / 2), -Float32(π))
+        append!(ring, reverse(R))
+        push!(rings, arc!(ring, P[idx[1]], -nrm(d[1]) * (w[idx[1]] / 2), -Float32(π)))
+    end
+    return rings
+end
+
 function Makie.plot!(plot::Kinetic{<:Tuple{<:Vector{<:Point{2, T}}}}) where {T <: Real}
     # `:curv` measures how much room the curve has in pixels, so it needs the projected points,
     # and it re-fires on zoom: magnify a dense passage and the stroke fattens as it becomes
     # resolvable. Registered for every geometry so the widths mean the same thing in each.
-    register_projected_positions!(plot, Point2f; input_name = :x,
-                                  output_name = :pixel_points, output_space = :pixel)
-    map!(plot.attributes,
-         [:linewidth, :x, :pixel_points, :widthrange, :crowding, :taper, :linewidthscale],
-         :pointwidths) do mode, xy, P, wr, crowding, taper, lscale
+    register_projected_positions!(
+        plot, Point2f; input_name = :x,
+        output_name = :pixel_points, output_space = :pixel
+    )
+    map!(
+        plot.attributes,
+        [:linewidth, :x, :pixel_points, :widthrange, :crowding, :taper, :linewidthscale],
+        :pointwidths
+    ) do mode, xy, P, wr, crowding, taper, lscale
         widthprofile(mode, xy, P, wr, crowding, taper) .* lscale
     end
     rasterize = pop_rasterize!(plot)
@@ -348,20 +440,36 @@ function Makie.plot!(plot::Kinetic{<:Tuple{<:Vector{<:Point{2, T}}}}) where {T <
     if geometry === :segments
         map!(segmentwidths, plot.attributes, [:pointwidths], :linewidths)
         map!(interleave, plot.attributes, [:x], :final_x)
-        linesegments!(plot, plot.attributes, plot.final_x; linewidth = plot.linewidths,
-                      rasterize)
+        linesegments!(
+            plot, plot.attributes, plot.final_x; linewidth = plot.linewidths,
+            rasterize
+        )
     elseif geometry === :lines
         lines!(plot, plot.attributes, plot.x; linewidth = plot.pointwidths, rasterize)
     elseif geometry === :mesh
-        map!(plot.attributes, [:pixel_points, :pointwidths, :color],
-             [:strokeverts, :strokefaces, :strokecolor]) do P, w, c
-            V, F, S = strokemesh(P, w)
-            return (V, F, c isa AbstractVector && length(c) == length(P) ? c[S] : c)
+        # A single closed outline has no interior edges, so CairoMakie anti-aliases it; it
+        # paints a mesh through a Cairo mesh pattern, which it does not. One ring carries one
+        # colour, though, so a per-point colour still needs the triangles. Read once, like
+        # `geometry` above.
+        c = plot.color[]
+        if c isa AbstractVector && length(c) > 1
+            map!(
+                plot.attributes, [:pixel_points, :pointwidths, :color],
+                [:strokeverts, :strokefaces, :strokecolor]
+            ) do P, w, c
+                V, F, S = strokemesh(P, w)
+                return (V, F, c isa AbstractVector && length(c) == length(P) ? c[S] : c)
+            end
+            # ! CairoMakie paints a mesh 16384 patches at a time, so a translucent stroke of
+            # more than ~8000 points can double-blend at one joint per batch
+            mesh!(
+                plot, plot.attributes, plot.strokeverts, plot.strokefaces;
+                color = plot.strokecolor, space = :pixel, shading = NoShading, rasterize
+            )
+        else
+            map!(strokeoutline, plot.attributes, [:pixel_points, :pointwidths], :strokerings)
+            poly!(plot, plot.attributes, plot.strokerings; space = :pixel, strokewidth = 0)
         end
-        # ! CairoMakie paints a mesh 16384 patches at a time, so a translucent stroke of more
-        # than ~8000 points can double-blend at one joint per batch
-        mesh!(plot, plot.attributes, plot.strokeverts, plot.strokefaces;
-              color = plot.strokecolor, space = :pixel, shading = NoShading, rasterize)
     else
         throw(ArgumentError("geometry must be :auto, :mesh, :lines or :segments, got $geometry"))
     end
