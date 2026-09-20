@@ -34,7 +34,9 @@ end
     ax = Axis(f[1, 1])
     kinetic!(ax, x, y; linewidthscale = 0.5, linewidth = :curv, linecap = :round)
     display(f)
-    save("recipes/kinetic.png", f)
+    # ! CairoMakie paints a mesh through a Cairo mesh pattern, which is not anti-aliased, so a
+    # thin `:mesh` stroke steps visibly. Raster it finer; this one goes in the README.
+    save("recipes/kinetic.png", f; px_per_unit = 4)
 
     # one width per point feeds every geometry
     @test kinetic(1:10, 1:10; linewidth = 3).plot.pointwidths[] == fill(3.0, 10)
