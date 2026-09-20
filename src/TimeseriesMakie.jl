@@ -63,8 +63,51 @@ pop_rasterize!(plot) = Makie.to_value(pop!(plot.kw, :rasterize, false))
 include("Recipes.jl")
 
 # * Extensions
+"""
+    spectrumplot(x; kwargs...)
+    spectrumplot(f, s; kwargs...)
+
+Plot a power spectrum, optionally marking and labelling its prominent peaks. Requires the
+`TimeseriesTools` extension (`using TimeseriesTools`).
+
+`x` may be a `UnivariateSpectrum`, a `MultivariateSpectrum` (reduced to a line and a spread
+band), an `AbstractTimeseries` (its `spectrum` is taken first), or a vector of `Point2`.
+Given two arguments, `f` holds the frequencies and `s` the spectral density.
+
+## Key attributes:
+
+- `peaks` = `false`: mark prominent peaks. `true` marks every one found, an `Int` the `n` most
+  prominent, and a `Real` those whose prominence exceeds that fraction of their height.
+
+- `pwindow` = `10`: the neighbourhood, in samples, over which a peak must be maximal. A noisy
+  or finely resolved spectrum usually needs a smaller value than the default.
+
+- `annotate` = `false`: label the marked peaks. `true` prints their coordinates; a function,
+  or a tuple of one per coordinate, formats them. `textformat` post-processes that tuple.
+
+- `nonnegative` = `true`: drop non-positive frequencies and densities, which a log axis cannot
+  show.
+
+- `average` = `median` and `width` = `(q₀.₂₅, q₀.₇₅)`: how a multivariate spectrum is reduced
+  to a line and a band. `width` takes a number (a symmetric width), a pair of numbers, a
+  function of each frequency's values, or a pair of such functions. `bandalpha` and
+  `bandcolor` style the result.
+
+_Other attributes are shared with `Makie.Lines`, `Makie.Scatter`, `Makie.Band` and
+`Makie.Text`._
+
+See also [`plotspectrum`](@ref), which sets log axes, limits and unit-aware labels to match.
+"""
 function spectrumplot end
 function spectrumplot! end
+
+"""
+    plotspectrum(x; axis = (), kwargs...)
+
+Plot a spectrum as [`spectrumplot`](@ref) does, into an axis that is additionally given log
+scales, limits covering the positive data, and axis labels carrying the units of `x`.
+Requires the `TimeseriesTools` extension (`using TimeseriesTools`).
+"""
 function plotspectrum end
 function plotspectrum! end
 export spectrumplot, spectrumplot!, plotspectrum, plotspectrum!
