@@ -4,10 +4,10 @@
 Plot a fading trace of points in 2D or 3D space.
 
 ## Key attributes:
-`npoints` = `automatic`: Fixes the length of the trail.
+`n_points` = `automatic`: Fixes the length of the trail.
 By default, this is equal to the
 length of `x` and `y`.
-If `npoints` is less than the length of `x` and `y`, the last `npoints` will be plotted.
+If `n_points` is less than the length of `x` and `y`, the last `n_points` will be plotted.
 
 `linecolor` = `@inherit linecolor`: Sets the color of the trail.
 Should be a single color (e.g. "red", :red, (:red, 0.2), RGBA(0.1, 0.2, 0.3, 0.4)). This
