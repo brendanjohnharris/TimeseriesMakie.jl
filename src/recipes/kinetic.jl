@@ -40,9 +40,8 @@ no effect.
 - `:auto` - `:lines` on GLMakie and WGLMakie, `:mesh` on every other backend
 - `:mesh` - a stroke built in pixel space. Continuous taper, uniform transparency and a width
   isotropic in pixels on any axis, on every backend; caps and joins are always round. A uniform
-  colour draws as a single filled outline and a per-point colour as triangles, which is why
-  `ext/CairoMakieAntiAliasExt.jl` exists: CairoMakie leaves the triangles hard-edged until it
-  is loaded
+  colour draws as a single filled outline, which CairoMakie anti-aliases; a per-point colour
+  needs triangles, which it paints through a Cairo mesh pattern and leaves with hard edges
 - `:lines` - a single `lines` carrying one width per point. Renders as `:mesh` does on GLMakie
   and WGLMakie, which stroke a varying width natively; CairoMakie cannot, and errors
 - `:segments` - a `linesegments` with one width per segment, hiding the joints behind `linecap`.
