@@ -17,6 +17,7 @@ using TestItemRunner
     end
 
     using CairoMakie
+    import CairoMakie.Makie
     using CairoMakie.Makie.PlotUtils
     using Statistics
     using LinearAlgebra
@@ -35,19 +36,159 @@ end
     display(f)
     save("recipes/kinetic.png", f)
 
-    # A constant width profile (a straight line, or any curve of constant curvature) has no
-    # variation to normalise; it must draw at a uniform width rather than at `NaN`.
+    # one width per point feeds every geometry
+    @test kinetic(1:10, 1:10; linewidth = 3).plot.pointwidths[] == fill(3.0, 10)
+    @test kinetic(1:3, [0.0, 1.0, 0.0]; linewidth = :y).plot.pointwidths[] ≈ [1, 11, 1]
+    @test kinetic(1:3, [0.0, 1.0, 0.0]; linewidth = :y,
+                  widthrange = (2, 6)).plot.pointwidths[] ≈ [2, 6, 2]
+    # the pipeline is lazy: read the node so the `map!` actually runs
+    @test throws_with(() -> kinetic(1:3, 1:3; linewidth = :nope).plot.pointwidths[],
+                      "linewidth must be")
+
     for mode in (:curv, :x, :y)
-        w = kinetic(1:10, 1:10; linewidth = mode).plot.linewidths[]
+        w = kinetic(1:10, 1:10; linewidth = mode, geometry = :segments).plot.linewidths[]
         @test length(w) == 18 && all(isfinite, w)
     end
-    @test allequal(kinetic(1:10, (1:10) .^ 2).plot.linewidths[])
-    @test !allequal(kinetic(x, y).plot.linewidths[])           # a real curve still varies
+    # nothing crowds an open straight line, so it draws at the full width throughout
+    @test allequal(kinetic(1:10, 1:10).plot.pointwidths[])
+    @test !allequal(kinetic(x, y; geometry = :segments).plot.linewidths[])
 
-    # too few points to define a curvature, and a lone point's degenerate segment
-    @test length(kinetic([0.0, 1.0], [0.0, 2.0]).plot.linewidths[]) == 2
-    @test length(kinetic([0.0], [0.0]).plot.linewidths[]) == 2
-    @test length(kinetic(1:10, 1:10; linewidth = 3).plot.linewidths[]) == 18
+    # a segment takes the mean of its two point widths, each repeated over the pair
+    @test TimeseriesMakie.segmentwidths([1.0, 11.0, 1.0]) ≈ [6.0, 6.0, 6.0, 6.0]
+
+    # too few points to measure any crowding, and a lone point's degenerate segment
+    @test length(kinetic([0.0, 1.0], [0.0, 2.0]; geometry = :segments).plot.linewidths[]) == 2
+    @test length(kinetic([0.0], [0.0]; geometry = :segments).plot.linewidths[]) == 2
+    @test length(kinetic(1:10, 1:10; linewidth = 3, geometry = :segments).plot.linewidths[]) ==
+          18
+
+    # a NaN break must not poison the arc length and leave every width NaN
+    w = kinetic([0.0, 1.0, NaN, 3.0, 4.0], [0.0, 1.0, NaN, 1.0, 0.0]).plot.pointwidths[]
+    @test length(w) == 5 && all(isfinite, w)
+end
+
+@testitem "Kinetic crowding" setup=[Setup] begin
+    # `ballradius` has to reproduce both closed forms: a tight turn and a near miss are meant to
+    # be the same measurement of how much room the curve has
+    φ = range(0, 2π, length = 400)[1:(end - 1)]
+    for R in (5.0, 40.0, 200.0)
+        r = TimeseriesMakie.ballradius(R .* cos.(φ), R .* sin.(φ), 1e6)
+        @test all(≈(R; rtol = 1e-5), r[2:(end - 1)]) # the open ends have a one-sided normal
+    end
+    d = 7.0
+    X = vcat(range(0, 300, length = 500), range(300, 0, length = 500))
+    Y = vcat(fill(0.0, 500), fill(d, 500))
+    @test all(≈(d / 2; rtol = 1e-6), TimeseriesMakie.ballradius(X, Y, 1e6)[100:400])
+
+    # the slope limit stays under its bound and never exceeds its rate
+    b = [10.0, 10, 10, 1, 10, 10, 10]
+    w = TimeseriesMakie.slopelimit(b, collect(0.0:6.0), 2.0)
+    @test w ≈ [7, 5, 3, 1, 3, 5, 7]
+    @test all(w .<= b) && maximum(abs, diff(w)) <= 2 + 1e-9
+
+    t = range(0, 1, length = 3000)
+    burst = sin.(2π .* 1.5 .* t) .+
+            0.45 .* sin.(2π .* 45 .* t) .* exp.(-((t .- 0.5) ./ 0.04) .^ 2)
+    f = Figure(size = (900, 300))
+    p = kinetic!(Axis(f[1, 1]), t, burst)
+    Makie.colorbuffer(f) # resolve the projection the widths are measured in
+    w = p.pointwidths[]
+    inside = abs.(t .- 0.5) .< 0.06
+    @test mean(w[inside]) < 0.4 * mean(w[.!inside]) # the burst is the crowded part
+    @test maximum(abs, diff(w)) < 1 # and it gets there gradually
+
+    # `crowding` is the fraction of the available room the stroke fills
+    @test mean(kinetic(t, burst; crowding = 0.25).plot.pointwidths[]) <
+          mean(kinetic(t, burst; crowding = 1.0).plot.pointwidths[])
+    # `widthrange` bounds the result
+    w = kinetic(t, burst; widthrange = (2, 6)).plot.pointwidths[]
+    @test minimum(w) >= 2 - 1e-9 && maximum(w) <= 6 + 1e-9
+    # a lower `taper` flattens the profile
+    @test std(kinetic(t, burst; taper = 0.005).plot.pointwidths[]) <
+          std(kinetic(t, burst; taper = 0.2).plot.pointwidths[])
+end
+
+@testitem "Kinetic stroke mesh" setup=[Setup] begin
+    using TimeseriesMakie: strokemesh
+
+    # a horizontal line of constant width fills a band of that width, with round caps of radius w/2
+    P = Point2f.(0:10:100, 0)
+    V, F, S = strokemesh(P, fill(6.0, length(P)))
+    @test maximum(last, V) - minimum(last, V) ≈ 6 atol=1e-3   # quads are exact
+    @test minimum(first, V) ≈ -3 atol=0.2                     # caps are polygons: 0.2 px chord
+    @test maximum(first, V) ≈ 103 atol=0.2
+    @test length(S) == length(V) && all(in(eachindex(P)), S)
+    @test all(f -> all(in(eachindex(V)), f), F)
+
+    # the taper is linear between the two end widths
+    V, _, _ = strokemesh(Point2f[(0, 0), (100, 0)], [2.0, 10.0])
+    @test maximum(abs(v[2]) for v in V if abs(v[1]) < 1e-3) ≈ 1 atol=1e-3
+    @test maximum(abs(v[2]) for v in V if abs(v[1] - 100) < 1e-3) ≈ 5 atol=1e-3
+
+    # a right-angle turn gets a fan on the outer corner and nothing on the inner side
+    V, _, S = strokemesh(Point2f[(0, 0), (50, 0), (50, 50)], fill(10.0, 3))
+    corner = Point2f(50, 0)
+    ring = [v for (v, s) in zip(V, S) if s == 2 && abs(norm(v - corner) - 5) < 1e-3]
+    @test any(v -> v[1] > 50 && v[2] < 0, ring)
+    @test !any(v -> v[1] < 50 - 1e-3 && v[2] > 1e-3, ring)
+
+    # a turn too small to open a visible gap emits no fan
+    straight = strokemesh(Point2f[(0, 0), (50, 0), (100, 0)], fill(4.0, 3))[2]
+    nearly = strokemesh(Point2f[(0, 0), (50, 0), (100, 0.01)], fill(4.0, 3))[2]
+    @test length(nearly) == length(straight)
+
+    # degenerate input: a lone point is a dot, repeated points and NaNs do not poison the mesh
+    V, F, _ = strokemesh([Point2f(3, 4)], [2.0])
+    @test !isempty(F)
+    @test all(v -> abs(norm(v - Point2f(3, 4)) - 1) < 1e-3 || v == Point2f(3, 4), V)
+    V, _, _ = strokemesh(Point2f[(0, 0), (0, 0), (10, 0)], fill(2.0, 3))
+    @test all(v -> all(isfinite, v), V)
+    V, _, _ = strokemesh(Point2f[(0, 0), (10, 0), (NaN, NaN), (20, 0), (30, 0)], fill(2.0, 5))
+    @test all(v -> all(isfinite, v), V)
+end
+
+@testitem "Kinetic geometry" setup=[Setup] begin
+    # CairoMakie cannot stroke a varying width, so `:auto` picks the pixel-space mesh
+    @test TimeseriesMakie.autogeometry() === :mesh
+    @test kinetic(1:10, 1:10).plot.plots[1] isa Mesh
+    @test kinetic(1:10, 1:10; geometry = :segments).plot.plots[1] isa LineSegments
+    @test throws_with(() -> kinetic(1:3, 1:3; geometry = :nope), "geometry must be")
+
+    # :lines hands the per-point widths to one `lines!`, which GLMakie renders natively
+    p = kinetic(1:10, 1:10; geometry = :lines).plot
+    @test p.plots[1] isa Lines && length(p.plots[1].linewidth[]) == 10
+    # widths are pixels, so limits come from the points alone
+    @test Makie.widths(Makie.data_limits(p))[1:2] ≈ [9, 9]
+
+    # the stroke is w pixels wide however anisotropic the axis
+    f = Figure(size = (200, 800))
+    ax = Axis(f[1, 1]; limits = (0, 10, -1e-3, 1e-3))
+    p = kinetic!(ax, 0:10, zeros(11); linewidth = 4, geometry = :mesh)
+    Makie.colorbuffer(f) # resolves the camera and the projected nodes
+    ys = last.(p.strokeverts[])
+    @test maximum(ys) - minimum(ys) ≈ 4 atol=1e-2
+    @test Makie.widths(Makie.data_limits(p))[1] ≈ 10 # pixel geometry never leaks into limits
+
+    # zooming changes the projected points, not the pixel width
+    ax.limits = (0, 5, -1, 1)
+    Makie.colorbuffer(f)
+    ys = last.(p.strokeverts[])
+    @test maximum(ys) - minimum(ys) ≈ 4 atol=1e-2
+
+    # per-point colours expand onto the emitted vertices
+    fap = kinetic(1:5, 1:5; color = 1:5, geometry = :mesh)
+    Makie.colorbuffer(fap.figure)
+    @test length(fap.plot.strokecolor[]) == length(fap.plot.strokeverts[])
+
+    # sparse points and alpha below 1 are where the mesh earns its keep
+    f = Figure(size = (600, 300))
+    x = range(-4π, 4π, length = 40)
+    y = sinc.(x)
+    kinetic!(Axis(f[1, 1]; title = ":segments"), x, y; linewidthscale = 2,
+             color = (:black, 0.4), geometry = :segments)
+    kinetic!(Axis(f[1, 2]; title = ":mesh"), x, y; linewidthscale = 2,
+             color = (:black, 0.4), geometry = :mesh)
+    save("recipes/kinetic_mesh.png", f)
 end
 
 @testitem "Trail 2D" setup=[Setup] begin
