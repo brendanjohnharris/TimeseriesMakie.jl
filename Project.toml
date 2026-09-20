@@ -9,12 +9,18 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [weakdeps]
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 TimeseriesTools = "380cddd1-6ef2-46ca-b087-e7151fb095ff"
 
 [extensions]
+# ! CairoMakieAntiAliasExt is a temporary workaround; see the header of its source file
+CairoMakieAntiAliasExt = ["CairoMakie"]
 TimeseriesToolsExt = ["TimeseriesTools"]
 
 [compat]
+# ! CairoMakie is pinned tight on purpose: the workaround extension replaces one of its
+# ! internals, so a new minor must not silently pick up a stale patch
+CairoMakie = "0.15"
 LinearAlgebra = "1.10"
 Makie = "0.24"
 Random = "1.10"

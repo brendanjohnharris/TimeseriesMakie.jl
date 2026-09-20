@@ -189,6 +189,30 @@ end
     @test length(pr.strokerings[]) == 1 && all(all(isfinite, v) for v in only(pr.strokerings[]))
 end
 
+@testitem "Kinetic mesh anti-aliasing" setup = [Setup] begin
+    # ! TEMPORARY, paired with ext/CairoMakieAntiAliasExt.jl: delete both once CairoMakie
+    # ! anti-aliases a 2D mesh itself. The assertion stays true either way, so it is safe to
+    # ! leave until then.
+    x = range(-4π, 4π, length = 400)
+    y = sinc.(x)
+    blue = Makie.RGBf(0.2, 0.4, 0.8)
+    levels = map((blue, fill(blue, 400))) do colour # scalar takes the outline, vector the mesh
+        f = Figure(size = (600, 300))
+        ax = Axis(f[1, 1])
+        hidedecorations!(ax)
+        hidespines!(ax)
+        kinetic!(ax, x, y; linewidth = 8, color = colour)
+        mktempdir() do dir
+            file = joinpath(dir, "aa.png")
+            save(file, f)
+            img = CairoMakie.FileIO.load(file)
+            return length(unique(round.(Float64.(CairoMakie.Colors.red.(img[:, 600])), digits = 2)))
+        end
+    end
+    # without the workaround the mesh gives exactly two: the stroke colour and the background
+    @test all(>(2), levels)
+end
+
 @testitem "Kinetic geometry" setup = [Setup] begin
     # CairoMakie cannot stroke a varying width, so `:auto` picks the pixel-space mesh
     @test TimeseriesMakie.autogeometry() === :mesh
