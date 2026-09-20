@@ -4,12 +4,25 @@
     using Unitful
     using TimeseriesMakie
     using TimeseriesTools
+    import TimeseriesTools: Timeseries
 end
 
 @testitem "Tools default" setup = [ToolsSetup] begin
+    # `plottype` picks the recipe from the array's dimensionality
     x = colorednoise(0.1:0.1:12)
     p = plot(x)
     @test p.plot isa Makie.Lines
+
+    x = Timeseries(randn(1000, 2), 0.01:0.01:10, 1:2)
+    @test (@test_nowarn plot(x)).plot isa Makie.Heatmap
+    # a lookup that is not contiguous still reaches the heatmap
+    x = Timeseries(randn(1000, 2), 0.01:0.01:10, [1, 3])
+    @test (@test_nowarn plot(x)).plot isa Makie.Heatmap
+
+    # a spectrum is one-dimensional, so it reaches `lines` like a series does
+    fs = 1000
+    ts = Timeseries(sin.(2π * 50 .* range(0, 1, length = fs + 1)), range(0, 1, length = fs + 1))
+    @test (@test_nowarn lines(powerspectrum(ts, fs / 100))).plot isa Makie.Lines
 end
 
 @testitem "Tools compatibility" setup = [ToolsSetup] begin
@@ -19,6 +32,19 @@ end
     @test p.plot isa Traces
     p = @test_nowarn TimeseriesMakie.traces(x)
     @test p.plot isa Traces
+    # the conversion hands back both lookups and a plain matrix
+    pargs = Makie.convert_arguments(Traces, x)
+    @test pargs[1] == lookup(x, 1) |> collect
+    @test pargs[2] == lookup(x, 2) |> collect
+    @test pargs[3] isa Matrix
+
+    # a multivariate unitful spectrum, stripped, on log axes
+    t = 0.005:0.005:1.0e3
+    U = ToolsArray([colorednoise(t * u"s") .* i * u"V" for i in 1:4], Var(1:4)) |> stack
+    S = ustripall(spectrum(U)[2:10:end, :])
+    f = Figure()
+    ax = Axis(f[1, 1], xscale = log10, yscale = log10)
+    @test_nowarn TimeseriesMakie.traces!(ax, S; colormap = :turbo)
 
     # * Kinetic
     x = ToolsArray(sin.(0.1:0.1:12), 𝑡(0.1:0.1:12))

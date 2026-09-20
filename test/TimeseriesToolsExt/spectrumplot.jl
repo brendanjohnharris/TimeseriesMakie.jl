@@ -63,4 +63,11 @@ end
     S = powerspectrum(x, 0.001) # Second arguments sets frequency spacing
     plotspectrum!(ax, S)
     f
+
+    # the default recipe reads the frequency lookup, so the axis spans frequencies
+    S = ustripall(powerspectrum(colorednoise((0.005:0.005:1.0e4) * u"s") * u"V", 0.0005))
+    f, ax, p = plot(S)
+    tightlimits!(ax)
+    @test ax isa Axis
+    @test ax.finallimits.val.widths[1] ≈ 100 atol = 1.0e-2
 end
